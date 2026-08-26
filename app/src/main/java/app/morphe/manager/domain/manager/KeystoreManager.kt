@@ -79,7 +79,11 @@ class KeystoreManager(app: Application, private val prefs: PreferencesManager) {
         runCatching {
             val tempFile = File.createTempFile("apk-sanitized-", ".apk", input.parentFile)
             ZipFile(input).use { zip ->
-                ZipOutputStream(tempFile.outputStream()).use { zos ->
+                // ZipOutputStream deflates into a 512-byte buffer and writes straight through, so
+                // an unbuffered sink costs on the order of one syscall per 512 bytes of output -
+                // hundreds of thousands of them for an APK this size. Buffering changes nothing
+                // about the bytes produced, only how many writes they take.
+                ZipOutputStream(tempFile.outputStream().buffered(1 shl 16)).use { zos ->
                     zip.entries().asSequence().forEach { entry ->
                         val cleanEntry = ZipEntry(entry.name).apply {
                             method = entry.method
