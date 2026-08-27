@@ -196,6 +196,17 @@ class ProcessRuntime(
         val managerBaseApk = pm.getPackageInfo(context.packageName)!!.applicationInfo!!.sourceDir
         val propOverride = resolvePropOverride(context)?.absolutePath
 
+        // MEASUREMENT-ONLY (not for release): override the heap cap via
+        // `adb shell setprop debug.morphe.memlimit N` to sweep OOM thresholds.
+        @Suppress("NAME_SHADOWING")
+        val memoryLimit = runCatching {
+            @Suppress("PrivateApi")
+            (Class.forName("android.os.SystemProperties")
+                .getMethod("get", String::class.java)
+                .invoke(null, "debug.morphe.memlimit") as String).toIntOrNull()
+        }.getOrNull() ?: memoryLimit
+        android.util.Log.w("MorpheMemBench", "effective heap cap = ${memoryLimit}M")
+
         val heapSizeString = "${memoryLimit}M"
         val env =
             System.getenv().toMutableMap().apply {
